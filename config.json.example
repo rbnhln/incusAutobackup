@@ -1,0 +1,80 @@
+{
+  "iab": {
+    "iabCredDir": "./root/.config/incusAutobackup",
+    "uuid": "",
+    "stopInstance": false,
+    "healthchecksUrl": "https://hc.example.tld/ping/your-uuid-here"
+  },
+  "hosts": [
+    {
+      "name": "prod-source",
+      "role": "source",
+      "url": "https://192.168.1.100:8443"
+    },
+    {
+      "name": "prod-target",
+      "role": "target",
+      "url": "https://192.168.1.101:8443"
+    }
+  ],
+  "projects": [
+    {
+      "name": "default",
+      "description": "Example Project with different instances and volumes on different storages",
+      "mode": "pull",
+      "instances": [
+        { "name": "c1", "storage": "local" },
+        { "name": "c2", "storage": "local" },
+        { "name": "vm1", "storage": "extra", "excludeDevices": ["eth0", "custom-volume-1"] }
+      ],
+      "volumes": [
+        { "name": "v1", "storage": "local" },
+        { "name": "v2", "storage": "extra" }
+      ]
+    }
+  ],
+  "retention": {
+    "hosts": {
+      "source": {
+        "default": "6,1h2d,1d2w,1w3m",
+        "projects": {
+          "default": {
+            "default": "10,1h1d,1d1w,1w2m",
+            "instances": {
+              "default": "5,1h1d,1d1w",
+              "byName": {
+                "vm1": "24,1h1d,1d2w,1w2m"
+              }
+            },
+            "volumes": {
+              "default": "7,1h2d,1d2w",
+              "byName": {
+                "v2": "12,1h2d,1d4w,1w6m"
+              }
+            }
+          }
+        }
+      },
+      "target": {
+        "default": "3,1h2d,1d2w",
+        "projects": {
+          "default": {
+            "default": "4,1h1d,1d2w",
+            "instances": {
+              "default": "3,1h1d,1d2w",
+              "byName": {
+                "c2": "6,1h2d,1d2w"
+              }
+            },
+            "volumes": {
+              "default": "4,1h1d,1d2w",
+              "byName": {
+                "v1": "8,1h2d,1d4w"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

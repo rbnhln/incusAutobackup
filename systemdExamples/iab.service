@@ -1,0 +1,7 @@
+[Unit]
+Description=IncusAutobackup (IAB)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/
+ExecStart=/root/iab

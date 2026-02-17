@@ -1,0 +1,81 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify module files + vendor
+        run: |
+          set -euo pipefail
+          go mod tidy -diff
+          go mod verify
+
+      - name: Run tests (uses vendor)
+        run: |
+          set -euo pipefail
+          go test -mod=vendor ./...
+
+      - name: Vet (uses vendor)
+        run: |
+          set -euo pipefail
+          go vet -mod=vendor ./...
+
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"   # v0.1.0 -> 0.1.0
+          awk -v tag="$TAG" '
+            $0 ~ "^## \\[" tag "\\]" {p=1}
+            $0 ~ "^## \\[" && p && $0 !~ "^## \\[" tag "\\]" {exit}
+            p {print}
+          ' CHANGELOG.md > release-notes.md
+
+          if ! grep -q "^## \\[$TAG\\]" release-notes.md; then
+            echo "Release notes for $TAG not found in CHANGELOG.md"
+            exit 1
+          fi
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          BIN="iab_${VERSION}_${GOOS}_${GOARCH}"
+          mkdir -p dist
+          go build -mod=vendor -trimpath -ldflags "-s -w" -o "dist/${BIN}" ./cmd
+          (cd dist && shasum -a 256 "${BIN}" > "${BIN}.sha256")
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+          body_path: release-notes.md
