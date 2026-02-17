@@ -199,7 +199,7 @@ func sanitizeDevicesForTarget(logger *slog.Logger, target incus.InstanceServer, 
 			return fmt.Errorf("check target network %s failed: %w", netName, err)
 		}
 
-		// search for additonal volumes which are not present on the target host
+		// search for additional volumes which are not present on the target host
 		// if the pool is provided via config it should be sync before automatically
 		if dev["type"] == "disk" && dev["pool"] != "" && dev["source"] != "" && dev["path"] != "/" {
 			pool := dev["pool"]

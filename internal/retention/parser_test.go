@@ -37,7 +37,7 @@ func TestParseSchedule_InvalidPolicies(t *testing.T) {
 		{name: "zero ttl amount", policy: "1d0w"},
 		{name: "garbage", policy: "abc"},
 		{name: "empty element", policy: "3,,1d2w"},
-		{name: "first element emtpy", policy: ",,2"},
+		{name: "first element empty", policy: ",,2"},
 	}
 
 	for _, tc := range tests {

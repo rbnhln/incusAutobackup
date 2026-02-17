@@ -1,5 +1,5 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/rbnhln/incusAutobackup)](https://pkg.go.dev/github.com/rbnhln/incusautobackup)
-[![Go Report Card](https://goreportcard.com/badge/github.com/rbnhln/incusAutobackup)](https://goreportcard.com/report/github.com/rbnhln/incusautobackup)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rbnhln/incusAutobackup)](https://goreportcard.com/report/github.com/rbnhln/incusAutobackup)
 
 # IncusAutobackup (IAB)
 
