@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.1.0] - 2026-02-20
 
 ### Changed
 - Backup run now executes in three strict phases: **Snapshot → Copy → Prune**. All snapshots (volumes and instances) are created before any copy operation starts, reducing drift between correlated resources. ([#6](https://github.com/rbnhln/incusAutobackup/issues/6))
