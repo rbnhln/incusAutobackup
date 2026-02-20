@@ -10,13 +10,13 @@ import (
 	"github.com/lxc/incus/v6/shared/api"
 )
 
-func SyncInstance(logger *slog.Logger, source, target incus.InstanceServer, instanceName, projectMode, targetPool string, stopIfRunning bool, excludeDevices []string) error {
-	logger.With("instance", instanceName)
+func SnapshotInstance(logger *slog.Logger, source incus.InstanceServer, instanceName string, stopIfRunning bool) (*api.Instance, error) {
+	logger = logger.With("instance", instanceName)
 
 	// 1 Check if instance exists
 	inst, _, err := source.GetInstance(instanceName)
 	if err != nil {
-		return fmt.Errorf("get source instance %s failed: %w", instanceName, err)
+		return nil, fmt.Errorf("get source instance %s failed: %w", instanceName, err)
 	}
 
 	// 2 Optional: Stop if running
@@ -24,7 +24,7 @@ func SyncInstance(logger *slog.Logger, source, target incus.InstanceServer, inst
 	if stopIfRunning {
 		state, _, err := source.GetInstanceState(instanceName)
 		if err != nil {
-			return fmt.Errorf("get instance state %s failed: %w", instanceName, err)
+			return nil, fmt.Errorf("get instance state %s failed: %w", instanceName, err)
 		}
 
 		if state != nil && state.Status == "Running" {
@@ -37,11 +37,11 @@ func SyncInstance(logger *slog.Logger, source, target incus.InstanceServer, inst
 				Force:   false,
 			}, "")
 			if err != nil {
-				return fmt.Errorf("stop instance %s failed: %w", instanceName, err)
+				return nil, fmt.Errorf("stop instance %s failed: %w", instanceName, err)
 			}
 			err = op.Wait()
 			if err != nil {
-				return fmt.Errorf("stop instance %s operation failed: %w", instanceName, err)
+				return nil, fmt.Errorf("stop instance %s operation failed: %w", instanceName, err)
 			}
 		}
 	}
@@ -72,14 +72,19 @@ func SyncInstance(logger *slog.Logger, source, target incus.InstanceServer, inst
 		Stateful: false,
 	})
 	if err != nil {
-		return fmt.Errorf("create snapshot for instance %s failed: %w", instanceName, err)
+		return nil, fmt.Errorf("create snapshot for instance %s failed: %w", instanceName, err)
 	}
 	err = opSnap.Wait()
 	if err != nil {
-		return fmt.Errorf("create snapshot for instance %s operation failed: %w", instanceName, err)
+		return nil, fmt.Errorf("create snapshot for instance %s operation failed: %w", instanceName, err)
 	}
 
+	return inst, nil
+}
+
+func CopyInstance(logger *slog.Logger, source, target incus.InstanceServer, instanceName, projectMode, targetPool string, excludeDevices []string, inst *api.Instance) error {
 	// 4 Copy to target
+	logger = logger.With("instance", instanceName)
 	logger.Info("copying instance to target")
 
 	copyArgs := incus.InstanceCopyArgs{
@@ -103,7 +108,7 @@ func SyncInstance(logger *slog.Logger, source, target incus.InstanceServer, inst
 	}
 
 	// sanitize devices for target host, drop with warn if not present
-	err = sanitizeDevicesForTarget(logger, target, instCopy.Devices, excludeDevices)
+	err := sanitizeDevicesForTarget(logger, target, instCopy.Devices, excludeDevices)
 	if err != nil {
 		return fmt.Errorf("sanitize devices failed: %w", err)
 	}

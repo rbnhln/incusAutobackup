@@ -7,16 +7,19 @@ import (
 	"log/slog"
 
 	incus "github.com/lxc/incus/v6/client"
+	"github.com/lxc/incus/v6/shared/api"
 )
 
 type ExecCtx struct {
-	Ctx           context.Context
-	Logger        *slog.Logger
-	Source        incus.InstanceServer
-	Target        incus.InstanceServer
-	DryRunCopy    bool
-	DryRunPrune   bool
-	StopInstances bool
+	Ctx               context.Context
+	Logger            *slog.Logger
+	Source            incus.InstanceServer
+	Target            incus.InstanceServer
+	DryRunCopy        bool
+	DryRunPrune       bool
+	StopInstances     bool
+	VolumeSnapshots   map[string]*api.StorageVolume
+	InstanceSnapshots map[string]*api.Instance
 }
 
 type Task interface {

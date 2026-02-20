@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lxc/incus/v6/shared/api"
 	"github.com/rbnhln/incusAutobackup/internal/config"
 	"github.com/rbnhln/incusAutobackup/internal/notifications"
 	"github.com/rbnhln/incusAutobackup/internal/runner"
@@ -33,6 +34,46 @@ func (app *application) serve() (retErr error) {
 	}()
 
 	plan := runner.Plan{}
+
+	// Phase 1: All Snapshots
+	for _, project := range app.config.Projects {
+		for _, vol := range project.Volumes {
+			plan.Add(runner.VolumeSnapshotTask{
+				ProjectName: project.Name,
+				PoolName:    vol.Storage,
+				VolumeName:  vol.Name,
+			})
+		}
+		for _, inst := range project.Instances {
+			plan.Add(runner.InstanceSnapshotTask{
+				ProjectName:  project.Name,
+				InstanceName: inst.Name,
+			})
+		}
+	}
+
+	// Phase 2: All Copies
+	for _, project := range app.config.Projects {
+		for _, vol := range project.Volumes {
+			plan.Add(runner.VolumeCopyTask{
+				ProjectName: project.Name,
+				PoolName:    vol.Storage,
+				VolumeName:  vol.Name,
+				Mode:        project.Mode,
+			})
+		}
+		for _, inst := range project.Instances {
+			plan.Add(runner.InstanceCopyTask{
+				ProjectName:    project.Name,
+				InstanceName:   inst.Name,
+				Mode:           project.Mode,
+				PoolName:       inst.Storage,
+				ExcludeDevices: inst.ExcludeDevices,
+			})
+		}
+	}
+
+	// Phase 3: All Prunes
 	for _, project := range app.config.Projects {
 		for _, vol := range project.Volumes {
 			srcPol := app.config.ResolveRetention("source", project.Name, config.RetentionVolumes, vol.Name)
@@ -40,13 +81,6 @@ func (app *application) serve() (retErr error) {
 			if app.config.IAB.IncusOSfix {
 				tgtPol = srcPol
 			}
-
-			plan.Add(runner.VolumeCopyTask{
-				ProjectName: project.Name,
-				PoolName:    vol.Storage,
-				VolumeName:  vol.Name,
-				Mode:        project.Mode,
-			})
 			plan.Add(runner.VolumePruneTask{
 				ProjectName:  project.Name,
 				PoolName:     vol.Storage,
@@ -61,21 +95,12 @@ func (app *application) serve() (retErr error) {
 			if app.config.IAB.IncusOSfix {
 				tgtPol = srcPol
 			}
-
-			plan.Add(runner.InstanceCopyTask{
-				ProjectName:    project.Name,
-				InstanceName:   inst.Name,
-				Mode:           project.Mode,
-				PoolName:       inst.Storage,
-				ExcludeDevices: inst.ExcludeDevices,
-			})
 			plan.Add(runner.InstancePruneTask{
 				ProjectName:  project.Name,
 				InstanceName: inst.Name,
 				SourcePolicy: srcPol,
 				TargetPolicy: tgtPol,
 			})
-
 		}
 	}
 
@@ -130,13 +155,15 @@ func (app *application) serve() (retErr error) {
 		"version", tgtInfo.Environment.ServerVersion)
 
 	exec := &runner.ExecCtx{
-		Ctx:           context.Background(),
-		Logger:        app.logger,
-		Source:        sourceClient,
-		Target:        targetClient,
-		DryRunCopy:    app.config.IAB.DryRunCopy,
-		DryRunPrune:   app.config.IAB.DryRunPrune,
-		StopInstances: app.config.IAB.StopInstance,
+		Ctx:               context.Background(),
+		Logger:            app.logger,
+		Source:            sourceClient,
+		Target:            targetClient,
+		DryRunCopy:        app.config.IAB.DryRunCopy,
+		DryRunPrune:       app.config.IAB.DryRunPrune,
+		StopInstances:     app.config.IAB.StopInstance,
+		VolumeSnapshots:   make(map[string]*api.StorageVolume),
+		InstanceSnapshots: make(map[string]*api.Instance),
 	}
 	return plan.Execute(exec)
 }
