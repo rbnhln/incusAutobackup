@@ -9,11 +9,12 @@ import (
 	"github.com/lxc/incus/v6/shared/api"
 )
 
-func SyncVolume(logger *slog.Logger, source, target incus.InstanceServer, poolName, volumeName, projectMode string) error {
+func SnapshotVolume(logger *slog.Logger, source incus.InstanceServer, poolName, volumeName string) (*api.StorageVolume, error) {
+	logger = logger.With("volume", volumeName)
 	// 1. Check if Volume exists on Source pool
 	incusVolume, _, err := source.GetStoragePoolVolume(poolName, "custom", volumeName)
 	if err != nil {
-		return fmt.Errorf("volume not found on source: %w", err)
+		return nil, fmt.Errorf("volume not found on source: %w", err)
 	}
 
 	// 2. Create Snapshot
@@ -26,13 +27,17 @@ func SyncVolume(logger *slog.Logger, source, target incus.InstanceServer, poolNa
 
 	op, err := source.CreateStoragePoolVolumeSnapshot(poolName, "custom", volumeName, req)
 	if err != nil {
-		return fmt.Errorf("failed to create snapshot: %w", err)
+		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
 	err = op.Wait()
 	if err != nil {
-		return fmt.Errorf("snapshot operation failed: %w", err)
+		return nil, fmt.Errorf("snapshot operation failed: %w", err)
 	}
+	return incusVolume, nil
+}
 
+func CopyVolume(logger *slog.Logger, source, target incus.InstanceServer, poolName, volumeName, projectMode string, incusVolume *api.StorageVolume) error {
+	logger = logger.With("volume", volumeName)
 	// 3. Copy to target
 	logger.Info("Copying volume to target")
 	copyArgs := incus.StoragePoolVolumeCopyArgs{
