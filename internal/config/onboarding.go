@@ -156,7 +156,7 @@ func TrustClientCertWithToken(hostURL, token, clientCertPEM, clientKeyPEM, UUID 
 	if err != nil {
 		return fmt.Errorf("trust POST failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
