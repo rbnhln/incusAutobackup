@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/rbnhln/incusAutobackup/internal/retention"
@@ -36,4 +37,12 @@ func planLog(logger *slog.Logger, plan retention.PrunePlan, kind transfer.Kind, 
 		)
 	}
 	return nil
+}
+
+func instanceKey(project, instance string) string {
+	return fmt.Sprintf("%s/%s", project, instance)
+}
+
+func volumeKey(project, pool, volume string) string {
+	return fmt.Sprintf("%s/%s/%s", project, pool, volume)
 }

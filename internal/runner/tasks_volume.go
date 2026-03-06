@@ -104,7 +104,3 @@ func (t VolumePruneTask) Execute(x *ExecCtx) error {
 
 	return nil
 }
-
-func volumeKey(project, pool, volume string) string {
-	return fmt.Sprintf("%s/%s/%s", project, pool, volume)
-}

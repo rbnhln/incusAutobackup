@@ -103,7 +103,3 @@ func (t InstancePruneTask) Execute(x *ExecCtx) error {
 	}
 	return nil
 }
-
-func instanceKey(project, instance string) string {
-	return fmt.Sprintf("%s/%s", project, instance)
-}
