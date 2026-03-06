@@ -4,18 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lxc/incus/v6/shared/api"
 	"github.com/rbnhln/incusAutobackup/internal/config"
 	"github.com/rbnhln/incusAutobackup/internal/notifications"
 	"github.com/rbnhln/incusAutobackup/internal/runner"
+	source "github.com/rbnhln/incusAutobackup/internal/source/incus"
+	target "github.com/rbnhln/incusAutobackup/internal/target/incus"
+	"github.com/rbnhln/incusAutobackup/internal/transfer"
 )
 
 func (app *application) serve() (retErr error) {
 	app.logger.Info("Application started")
-
-	// if configTypeBytes, err := json.MarshalIndent(app.config, "", "  "); err == nil {
-	// 	fmt.Printf("\n--- LOADED CONFIG ---\n%s\n---------------------\n\n", string(configTypeBytes))
-	// }
 
 	err := app.config.Validate()
 	if err != nil {
@@ -154,16 +152,30 @@ func (app *application) serve() (retErr error) {
 		"name", tgtInfo.Environment.ServerName,
 		"version", tgtInfo.Environment.ServerVersion)
 
+	//
+	src := source.New(app.logger, sourceClient, source.Options{
+		ProjectName:   app.config.Projects[0].Name,
+		StopIfRunning: app.config.IAB.StopInstance,
+	})
+
+	tgt, err := target.New(targetClient, target.Options{
+		ProjectName: app.config.Projects[0].Name,
+		Name:        targetConfig.Name,
+	})
+
+	if err != nil {
+		return err
+	}
+
 	exec := &runner.ExecCtx{
-		Ctx:               context.Background(),
+		Ctx:               ctx,
 		Logger:            app.logger,
-		Source:            sourceClient,
-		Target:            targetClient,
+		Source:            src,
+		Target:            tgt,
 		DryRunCopy:        app.config.IAB.DryRunCopy,
 		DryRunPrune:       app.config.IAB.DryRunPrune,
-		StopInstances:     app.config.IAB.StopInstance,
-		VolumeSnapshots:   make(map[string]*api.StorageVolume),
-		InstanceSnapshots: make(map[string]*api.Instance),
+		VolumeSnapshots:   make(map[string]transfer.Artifact),
+		InstanceSnapshots: make(map[string]transfer.Artifact),
 	}
 	return plan.Execute(exec)
 }

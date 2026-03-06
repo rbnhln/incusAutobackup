@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rbnhln/incusAutobackup/internal/backup"
+	"github.com/rbnhln/incusAutobackup/internal/pipeline"
+	"github.com/rbnhln/incusAutobackup/internal/target"
+	"github.com/rbnhln/incusAutobackup/internal/transfer"
 )
 
 type InstanceSnapshotTask struct {
@@ -32,6 +34,7 @@ func (t InstanceSnapshotTask) Name() string {
 }
 
 func (t InstanceSnapshotTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
 	logger := x.Logger.With("project", t.ProjectName, "instance", t.InstanceName)
 
 	if x.DryRunCopy {
@@ -39,15 +42,13 @@ func (t InstanceSnapshotTask) Execute(x *ExecCtx) error {
 		return nil
 	}
 
-	source := x.Source.UseProject(t.ProjectName)
-
-	inst, err := backup.SnapshotInstance(logger, source, t.InstanceName, x.StopInstances)
+	arti, err := x.Source.PrepareInstance(ctx, t.ProjectName, t.InstanceName)
 	if err != nil {
 		return err
 	}
 
 	key := instanceKey(t.ProjectName, t.InstanceName)
-	x.InstanceSnapshots[key] = inst
+	x.InstanceSnapshots[key] = arti
 	return nil
 }
 
@@ -56,6 +57,7 @@ func (t InstanceCopyTask) Name() string {
 }
 
 func (t InstanceCopyTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
 	logger := x.Logger.With("project", t.ProjectName, "instance", t.InstanceName)
 
 	if x.DryRunCopy {
@@ -64,29 +66,42 @@ func (t InstanceCopyTask) Execute(x *ExecCtx) error {
 	}
 
 	key := instanceKey(t.ProjectName, t.InstanceName)
-	inst, ok := x.InstanceSnapshots[key]
+	arti, ok := x.InstanceSnapshots[key]
 	if !ok {
 		logger.Warn("skipping copy: no snapshot was created (snapshot may have failed)")
 		return fmt.Errorf("no snapshot result found for instance %s – snapshot phase likely failed", key)
 	}
 
-	source := x.Source.UseProject(t.ProjectName)
-	target := x.Target.UseProject(t.ProjectName)
+	incusOpts := target.IncusCopyOptions{
+		Mode:           t.Mode,
+		TargetPool:     t.PoolName,
+		ExcludeDevices: t.ExcludeDevices,
+	}
 
-	return backup.CopyInstance(logger, source, target, t.InstanceName, t.Mode, t.PoolName, t.ExcludeDevices, inst)
+	return pipeline.Store(ctx, logger, x.Source, x.Target, arti, incusOpts)
 }
 
 func (t InstancePruneTask) Name() string {
-	return fmt.Sprintf("prune instance snapshot %s (%s)", t.InstanceName, t.ProjectName)
+	return fmt.Sprintf("prune instance snapshots %s (%s)", t.InstanceName, t.ProjectName)
 }
 
 func (t InstancePruneTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
+
 	logger := x.Logger.With("project", t.ProjectName, "instance", t.InstanceName)
+	now := time.Now()
 
-	source := x.Source.UseProject(t.ProjectName)
-	target := x.Target.UseProject(t.ProjectName)
+	// Source prune (Incus API direkt)
+	srcClient := x.Source.Server(t.ProjectName)
+	if err := pruneSourceInstance(logger, "source", srcClient, t.InstanceName, t.SourcePolicy, now, x.DryRunPrune); err != nil {
+		return fmt.Errorf("source prune failed: %w", err)
+	}
 
-	return backup.PruneInstance(logger, source, target, t.InstanceName, t.SourcePolicy, t.TargetPolicy, time.Now(), x.DryRunPrune)
+	// Target prune (über Target-Interface)
+	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindInstance, t.InstanceName, t.TargetPolicy, now, x.DryRunPrune); err != nil {
+		return fmt.Errorf("target prune failed: %w", err)
+	}
+	return nil
 }
 
 func instanceKey(project, instance string) string {

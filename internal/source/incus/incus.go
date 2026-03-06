@@ -15,7 +15,6 @@ import (
 type Options struct {
 	ProjectName   string
 	StopIfRunning bool
-	//SnapshotPrefix string
 }
 
 type Source struct {
@@ -29,6 +28,9 @@ func New(logger *slog.Logger, server incus.InstanceServer, opts Options) *Source
 }
 
 func (s *Source) Server(projectName string) incus.InstanceServer {
+	if projectName == "" {
+		projectName = s.opts.ProjectName
+	}
 	return s.server.UseProject(projectName)
 }
 
@@ -36,11 +38,15 @@ func (s *Source) snapshotName(now time.Time) string {
 	return fmt.Sprintf("IAB_%s", now.Format("20060102-150405"))
 }
 
-func (s *Source) PrepareInstance(ctx context.Context, instanceName string) (transfer.Artifact, error) {
-	_ = ctx // for incus only not needed (atm)
+func (s *Source) PrepareInstance(ctx context.Context, projectName, instanceName string) (transfer.Artifact, error) {
+	_ = ctx // incus operations currently not ctx-aware
 
-	logger := s.logger.With("project", s.opts.ProjectName, "instance", instanceName)
-	server := s.Server(s.opts.ProjectName)
+	if projectName == "" {
+		projectName = s.opts.ProjectName
+	}
+
+	logger := s.logger.With("project", projectName, "instance", instanceName)
+	server := s.Server(projectName)
 
 	// 1 Check if instance exists
 	_, _, err := server.GetInstance(instanceName)
@@ -48,7 +54,7 @@ func (s *Source) PrepareInstance(ctx context.Context, instanceName string) (tran
 		return transfer.Artifact{}, fmt.Errorf("get source instance %s failed: %w", instanceName, err)
 	}
 
-	// 2 Optonal: stop if running
+	// 2 Optional: stop if running
 	wasRunning := false
 	if s.opts.StopIfRunning {
 		state, _, err := server.GetInstanceState(instanceName)
@@ -106,16 +112,15 @@ func (s *Source) PrepareInstance(ctx context.Context, instanceName string) (tran
 		return transfer.Artifact{}, fmt.Errorf("create snapshot for instance %s operation failed: %w", instanceName, err)
 	}
 
-	// 4 Create recovery point
 	point := transfer.RecoveryPoint{
 		Kind:      transfer.KindInstance,
-		Project:   s.opts.ProjectName,
+		Project:   projectName,
 		Subject:   instanceName,
 		Name:      snapName,
 		CreatedAt: now,
 	}
 
-	artifact := transfer.Artifact{
+	arti := transfer.Artifact{
 		Point: point,
 		Open: func(ctx context.Context) (io.ReadCloser, error) {
 			_ = ctx
@@ -124,14 +129,18 @@ func (s *Source) PrepareInstance(ctx context.Context, instanceName string) (tran
 		Size: -1,
 	}
 
-	return artifact, nil
+	return arti, nil
 }
 
-func (s *Source) PrepareVolume(ctx context.Context, poolName, volumeName string) (transfer.Artifact, error) {
+func (s *Source) PrepareVolume(ctx context.Context, projectName, poolName, volumeName string) (transfer.Artifact, error) {
 	_ = ctx
 
-	logger := s.logger.With("project", s.opts.ProjectName, "pool", poolName, "volume", volumeName)
-	server := s.Server(s.opts.ProjectName)
+	if projectName == "" {
+		projectName = s.opts.ProjectName
+	}
+
+	logger := s.logger.With("project", projectName, "pool", poolName, "volume", volumeName)
+	server := s.Server(projectName)
 
 	// 1 Check if volume exists on source pool
 	_, _, err := server.GetStoragePoolVolume(poolName, "custom", volumeName)
@@ -144,29 +153,24 @@ func (s *Source) PrepareVolume(ctx context.Context, poolName, volumeName string)
 	snapName := s.snapshotName(now)
 	logger.Info("creating volume snapshot", "snapshot", snapName)
 
-	req := api.StorageVolumeSnapshotsPost{
-		Name: snapName,
-	}
-
+	req := api.StorageVolumeSnapshotsPost{Name: snapName}
 	op, err := server.CreateStoragePoolVolumeSnapshot(poolName, "custom", volumeName, req)
 	if err != nil {
 		return transfer.Artifact{}, fmt.Errorf("failed to create snapshot: %w", err)
 	}
-	err = op.Wait()
-	if err != nil {
+	if err := op.Wait(); err != nil {
 		return transfer.Artifact{}, fmt.Errorf("snapshot operation failed: %w", err)
 	}
 
-	// 4 create recovery point
 	point := transfer.RecoveryPoint{
 		Kind:      transfer.KindVolume,
-		Project:   s.opts.ProjectName,
+		Project:   projectName,
 		Subject:   fmt.Sprintf("%s/%s", poolName, volumeName),
 		Name:      snapName,
 		CreatedAt: now,
 	}
 
-	artifact := transfer.Artifact{
+	arti := transfer.Artifact{
 		Point: point,
 		Open: func(ctx context.Context) (io.ReadCloser, error) {
 			_ = ctx
@@ -174,6 +178,5 @@ func (s *Source) PrepareVolume(ctx context.Context, poolName, volumeName string)
 		},
 		Size: -1,
 	}
-
-	return artifact, nil
+	return arti, nil
 }

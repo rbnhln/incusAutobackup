@@ -8,7 +8,8 @@ import (
 )
 
 type Source interface {
-	PrepareInstance(ctx context.Context, instanceName string) (transfer.Artifact, error)
-	PrepareVolume(ctx context.Context, poolName, volumeName string) (transfer.Artifact, error)
+	PrepareInstance(ctx context.Context, projectName, instanceName string) (transfer.Artifact, error)
+	PrepareVolume(ctx context.Context, projectName, poolName, volumeName string) (transfer.Artifact, error)
+
 	Server(projectName string) incus.InstanceServer
 }

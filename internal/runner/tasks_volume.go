@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rbnhln/incusAutobackup/internal/backup"
+	"github.com/rbnhln/incusAutobackup/internal/pipeline"
+	"github.com/rbnhln/incusAutobackup/internal/target"
+	"github.com/rbnhln/incusAutobackup/internal/transfer"
 )
 
 type VolumeSnapshotTask struct {
@@ -33,6 +35,7 @@ func (t VolumeSnapshotTask) Name() string {
 }
 
 func (t VolumeSnapshotTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
 	logger := x.Logger.With("project", t.ProjectName, "pool", t.PoolName, "volume", t.VolumeName)
 
 	if x.DryRunCopy {
@@ -40,15 +43,13 @@ func (t VolumeSnapshotTask) Execute(x *ExecCtx) error {
 		return nil
 	}
 
-	source := x.Source.UseProject(t.ProjectName)
-
-	vol, err := backup.SnapshotVolume(logger, source, t.PoolName, t.VolumeName)
+	arti, err := x.Source.PrepareVolume(ctx, t.ProjectName, t.PoolName, t.VolumeName)
 	if err != nil {
 		return err
 	}
 
 	key := volumeKey(t.ProjectName, t.PoolName, t.VolumeName)
-	x.VolumeSnapshots[key] = vol
+	x.VolumeSnapshots[key] = arti
 	return nil
 }
 
@@ -57,6 +58,7 @@ func (t VolumeCopyTask) Name() string {
 }
 
 func (t VolumeCopyTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
 	logger := x.Logger.With("project", t.ProjectName, "pool", t.PoolName, "volume", t.VolumeName)
 
 	if x.DryRunCopy {
@@ -65,16 +67,17 @@ func (t VolumeCopyTask) Execute(x *ExecCtx) error {
 	}
 
 	key := volumeKey(t.ProjectName, t.PoolName, t.VolumeName)
-	vol, ok := x.VolumeSnapshots[key]
+	arti, ok := x.VolumeSnapshots[key]
 	if !ok {
 		logger.Warn("skipping copy: no snapshot was created (snapshot may have failed)")
 		return fmt.Errorf("no snapshot result found for volume %s – snapshot phase likely failed", key)
 	}
 
-	source := x.Source.UseProject(t.ProjectName)
-	target := x.Target.UseProject(t.ProjectName)
+	incusOpts := target.IncusCopyOptions{
+		Mode: t.Mode,
+	}
 
-	return backup.CopyVolume(logger, source, target, t.PoolName, t.VolumeName, t.Mode, vol)
+	return pipeline.Store(ctx, logger, x.Source, x.Target, arti, incusOpts)
 }
 
 func (t VolumePruneTask) Name() string {
@@ -82,13 +85,24 @@ func (t VolumePruneTask) Name() string {
 }
 
 func (t VolumePruneTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
 	logger := x.Logger.With("project", t.ProjectName, "pool", t.PoolName, "volume", t.VolumeName)
 
-	source := x.Source.UseProject(t.ProjectName)
-	target := x.Target.UseProject(t.ProjectName)
-
 	now := time.Now()
-	return backup.PruneVolume(logger, source, target, t.PoolName, t.VolumeName, t.SourcePolicy, t.TargetPolicy, now, x.DryRunPrune)
+
+	// Source prune (direkt auf Incus Source)
+	srcClient := x.Source.Server(t.ProjectName)
+	if err := pruneSourceVolume(logger, "source", srcClient, t.PoolName, t.VolumeName, t.SourcePolicy, now, x.DryRunPrune); err != nil {
+		return fmt.Errorf("source prune failed: %w", err)
+	}
+
+	// Target prune (über Target-Interface)
+	subject := fmt.Sprintf("%s/%s", t.PoolName, t.VolumeName)
+	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindVolume, subject, t.TargetPolicy, now, x.DryRunPrune); err != nil {
+		return fmt.Errorf("target prune failed: %w", err)
+	}
+
+	return nil
 }
 
 func volumeKey(project, pool, volume string) string {
