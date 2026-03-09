@@ -20,10 +20,21 @@ type IAB struct {
 	IncusOSfix      bool   `json:"-"`
 }
 
-type Host struct {
-	Name string `json:"name"`
-	Role string `json:"role"`
+type TargetType string
+
+const (
+	TargetTypeIncus TargetType = "incus"
+)
+
+type SourceHost struct {
+	Name string `json:"name,omitempty"`
 	URL  string `json:"url"`
+}
+
+type TargetHost struct {
+	Name string     `json:"name"`
+	Type TargetType `json:"type"`
+	URL  string     `json:"url"`
 }
 
 type Instance struct {
@@ -67,7 +78,8 @@ type RetentionConfig struct {
 
 type Config struct {
 	IAB       IAB             `json:"iab"`
-	Hosts     []Host          `json:"hosts"`
+	Source    SourceHost      `json:"source"`
+	Targets   []TargetHost    `json:"targets"`
 	Projects  []Project       `json:"projects"`
 	Retention RetentionConfig `json:"retention,omitempty"`
 }
@@ -108,6 +120,55 @@ func (c *Config) Validate() error {
 
 	if strings.TrimSpace(c.IAB.IABCredDir) == "" {
 		errs = append(errs, fmt.Errorf("iab.iabCredDir must not be empty"))
+	}
+
+	if strings.TrimSpace(c.Source.URL) == "" {
+		errs = append(errs, fmt.Errorf("source.url must not be empty"))
+	}
+
+	if len(c.Targets) == 0 {
+		errs = append(errs, fmt.Errorf("at least one target must be configured"))
+	}
+
+	targetNames := make(map[string]struct{}, len(c.Targets))
+	for i, t := range c.Targets {
+		name := strings.TrimSpace(t.Name)
+		if name == "" {
+			errs = append(errs, fmt.Errorf("targets[%d].name must not be empty", i))
+		} else {
+			if _, exists := targetNames[name]; exists {
+				errs = append(errs, fmt.Errorf("duplicate target name: %q", name))
+			}
+			targetNames[name] = struct{}{}
+		}
+
+		if strings.TrimSpace(t.URL) == "" {
+			errs = append(errs, fmt.Errorf("targets[%d].url must not be empty", i))
+		}
+
+		switch t.Type {
+		case TargetTypeIncus:
+		default:
+			errs = append(errs, fmt.Errorf("targets[%d].type %q is not supported", i, t.Type))
+		}
+	}
+
+	if len(c.Projects) == 0 {
+		errs = append(errs, fmt.Errorf("at least one project must be configured"))
+	}
+
+	projectNames := make(map[string]struct{}, len(c.Projects))
+	for i, p := range c.Projects {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			errs = append(errs, fmt.Errorf("projects[%d].name must not be empty", i))
+			continue
+		}
+		if _, exists := projectNames[name]; exists {
+			errs = append(errs, fmt.Errorf("duplicate project name: %q", name))
+			continue
+		}
+		projectNames[name] = struct{}{}
 	}
 
 	for role, hr := range c.Retention.Hosts {

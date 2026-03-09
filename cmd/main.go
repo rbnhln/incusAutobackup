@@ -13,14 +13,22 @@ import (
 	"github.com/rbnhln/incusAutobackup/internal/vcs"
 )
 
+type OnboardTarget struct {
+	Name  string
+	URL   string
+	Token string
+	Type  config.TargetType
+}
+
 type OnboardOptions struct {
 	SourceURL   string
 	SourceToken string
-	TargetURL   string
-	TargetToken string
+	Targets     []OnboardTarget
 	IABCredDIr  string
 	UUID        string
 }
+
+type targetSpecs []OnboardTarget
 
 var (
 	version = vcs.Version()
@@ -50,20 +58,29 @@ func main() {
 		onboardFlags := flag.NewFlagSet("onboard", flag.ExitOnError)
 		sourceURL := onboardFlags.String("sourceURL", "", "URL for the Source host")
 		sourceToken := onboardFlags.String("sourceToken", "", "Token for the source host")
-		targetURL := onboardFlags.String("targetURL", "", "URL for the Target host")
-		targetToken := onboardFlags.String("targetToken", "", "Token for the target host")
 		iabCredDir := onboardFlags.String("iabCredDir", defaultCredDir, "Path to store IAB credentials")
 		configPath := onboardFlags.String("outConfig", "./", "Path to initial config file (default: ./)")
 
+		var targetList targetSpecs
+		onboardFlags.Var(&targetList, "target", `Target spec: name=<n>,url=<u>,token=<t>[,type=incus] (repeatable)`)
+
 		_ = onboardFlags.Parse(os.Args[2:])
+
+		if *sourceURL == "" || *sourceToken == "" {
+			logger.Error("onboard requires --sourceURL and --sourceToken")
+			os.Exit(1)
+		}
+		if len(targetList) == 0 {
+			logger.Error("onboard requires at least one --target")
+			os.Exit(1)
+		}
 
 		unique_id := uuid.NewString()
 
 		opts := OnboardOptions{
 			SourceURL:   *sourceURL,
 			SourceToken: *sourceToken,
-			TargetURL:   *targetURL,
-			TargetToken: *targetToken,
+			Targets:     []OnboardTarget(targetList),
 			IABCredDIr:  *iabCredDir,
 			UUID:        unique_id,
 		}
@@ -76,7 +93,16 @@ func main() {
 
 		configFile := filepath.Join(*configPath, "config.json")
 
-		newCfg := config.NewPostOnboardConfig(opts.IABCredDIr, opts.SourceURL, opts.TargetURL, unique_id)
+		targetHosts := make([]config.TargetHost, 0, len(opts.Targets))
+		for _, t := range opts.Targets {
+			targetHosts = append(targetHosts, config.TargetHost{
+				Name: t.Name,
+				Type: t.Type,
+				URL:  t.URL,
+			})
+		}
+
+		newCfg := config.NewPostOnboardConfig(opts.IABCredDIr, opts.SourceURL, unique_id, targetHosts)
 		err = config.Write(configFile, newCfg)
 		if err != nil {
 			logger.Error("failed to write config", "error", err)
@@ -147,4 +173,44 @@ func parseLogLevel(s string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+func (t *targetSpecs) String() string { return "" }
+
+// --target "name=t1,url=https://1.2.3.4:8443,token=abc,type=incus"
+func (t *targetSpecs) Set(v string) error {
+	parts := strings.Split(v, ",")
+	item := OnboardTarget{Type: config.TargetTypeIncus}
+
+	for _, p := range parts {
+		kv := strings.SplitN(strings.TrimSpace(p), "=", 2)
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid target segment %q (expected key=value)", p)
+		}
+		key := strings.ToLower(strings.TrimSpace(kv[0]))
+		val := strings.TrimSpace(kv[1])
+
+		switch key {
+		case "name":
+			item.Name = val
+		case "url":
+			item.URL = val
+		case "token":
+			item.Token = val
+		case "type":
+			item.Type = config.TargetType(strings.ToLower(val))
+		default:
+			return fmt.Errorf("unknown target key %q", key)
+		}
+	}
+
+	if item.Name == "" || item.URL == "" || item.Token == "" {
+		return fmt.Errorf("target requires name,url,token")
+	}
+	if item.Type == "" {
+		item.Type = config.TargetTypeIncus
+	}
+
+	*t = append(*t, item)
+	return nil
 }

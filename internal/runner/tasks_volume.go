@@ -22,11 +22,17 @@ type VolumeCopyTask struct {
 	Mode        string
 }
 
-type VolumePruneTask struct {
+type VolumeSourcePruneTask struct {
 	ProjectName  string
 	PoolName     string
 	VolumeName   string
 	SourcePolicy string
+}
+
+type VolumeTargetPruneTask struct {
+	ProjectName  string
+	PoolName     string
+	VolumeName   string
 	TargetPolicy string
 }
 
@@ -80,12 +86,11 @@ func (t VolumeCopyTask) Execute(x *ExecCtx) error {
 	return pipeline.Store(ctx, logger, x.Source, x.Target, arti, incusOpts)
 }
 
-func (t VolumePruneTask) Name() string {
-	return fmt.Sprintf("prune volume snapshots %s/%s (%s)", t.PoolName, t.VolumeName, t.ProjectName)
+func (t VolumeSourcePruneTask) Name() string {
+	return fmt.Sprintf("prune source volume snapshots %s/%s (%s)", t.PoolName, t.VolumeName, t.ProjectName)
 }
 
-func (t VolumePruneTask) Execute(x *ExecCtx) error {
-	ctx := x.Ctx
+func (t VolumeSourcePruneTask) Execute(x *ExecCtx) error {
 	logger := x.Logger.With("project", t.ProjectName, "pool", t.PoolName, "volume", t.VolumeName)
 
 	now := time.Now()
@@ -96,11 +101,24 @@ func (t VolumePruneTask) Execute(x *ExecCtx) error {
 		return fmt.Errorf("source prune failed: %w", err)
 	}
 
-	// Target prune (über Target-Interface)
+	return nil
+}
+
+func (t VolumeTargetPruneTask) Name() string {
+	return fmt.Sprintf("prune target volume snapshots %s/%s (%s)", t.PoolName, t.VolumeName, t.ProjectName)
+}
+
+func (t VolumeTargetPruneTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
+	logger := x.Logger.With("project", t.ProjectName, "pool", t.PoolName, "volume", t.VolumeName)
+	now := time.Now()
+
 	subject := fmt.Sprintf("%s/%s", t.PoolName, t.VolumeName)
-	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindVolume, subject, t.TargetPolicy, t.ProjectName, now, x.DryRunPrune); err != nil {
+	if err := pruneTargetWithCtx(
+		ctx, logger, "target", x.Target,
+		transfer.KindVolume, subject, t.TargetPolicy, t.ProjectName, now, x.DryRunPrune,
+	); err != nil {
 		return fmt.Errorf("target prune failed: %w", err)
 	}
-
 	return nil
 }

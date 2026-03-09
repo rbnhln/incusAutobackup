@@ -22,10 +22,15 @@ type InstanceCopyTask struct {
 	ExcludeDevices []string
 }
 
-type InstancePruneTask struct {
+type InstanceSourcePruneTask struct {
 	ProjectName  string
 	InstanceName string
 	SourcePolicy string
+}
+
+type InstanceTargetPruneTask struct {
+	ProjectName  string
+	InstanceName string
 	TargetPolicy string
 }
 
@@ -81,24 +86,34 @@ func (t InstanceCopyTask) Execute(x *ExecCtx) error {
 	return pipeline.Store(ctx, logger, x.Source, x.Target, arti, incusOpts)
 }
 
-func (t InstancePruneTask) Name() string {
-	return fmt.Sprintf("prune instance snapshots %s (%s)", t.InstanceName, t.ProjectName)
+func (t InstanceSourcePruneTask) Name() string {
+	return fmt.Sprintf("prune source instance snapshots %s (%s)", t.InstanceName, t.ProjectName)
 }
 
-func (t InstancePruneTask) Execute(x *ExecCtx) error {
-	ctx := x.Ctx
-
+func (t InstanceSourcePruneTask) Execute(x *ExecCtx) error {
 	logger := x.Logger.With("project", t.ProjectName, "instance", t.InstanceName)
 	now := time.Now()
 
-	// Source prune (Incus API direkt)
 	srcClient := x.Source.Server(t.ProjectName)
 	if err := pruneSourceInstance(logger, "source", srcClient, t.InstanceName, t.SourcePolicy, now, x.DryRunPrune); err != nil {
 		return fmt.Errorf("source prune failed: %w", err)
 	}
+	return nil
+}
 
-	// Target prune (über Target-Interface)
-	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindInstance, t.InstanceName, t.TargetPolicy, t.ProjectName, now, x.DryRunPrune); err != nil {
+func (t InstanceTargetPruneTask) Name() string {
+	return fmt.Sprintf("prune target instance snapshots %s (%s)", t.InstanceName, t.ProjectName)
+}
+
+func (t InstanceTargetPruneTask) Execute(x *ExecCtx) error {
+	ctx := x.Ctx
+	logger := x.Logger.With("project", t.ProjectName, "instance", t.InstanceName)
+	now := time.Now()
+
+	if err := pruneTargetWithCtx(
+		ctx, logger, "target", x.Target,
+		transfer.KindInstance, t.InstanceName, t.TargetPolicy, t.ProjectName, now, x.DryRunPrune,
+	); err != nil {
 		return fmt.Errorf("target prune failed: %w", err)
 	}
 	return nil

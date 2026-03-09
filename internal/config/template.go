@@ -1,6 +1,6 @@
 package config
 
-func NewPostOnboardConfig(iabCredDir, sourceURL, targetURL, uuid string) Config {
+func NewPostOnboardConfig(iabCredDir, sourceURL, uuid string, targets []TargetHost) Config {
 	return Config{
 		IAB: IAB{
 			IABCredDir:      iabCredDir,
@@ -8,15 +8,16 @@ func NewPostOnboardConfig(iabCredDir, sourceURL, targetURL, uuid string) Config 
 			StopInstance:    false,
 			HealthchecksURL: "",
 		},
-		Hosts: []Host{
-			{Role: "source", URL: sourceURL, Name: ""},
-			{Role: "target", URL: targetURL, Name: ""},
+		Source: SourceHost{
+			Name: "",
+			URL:  sourceURL,
 		},
+		Targets:  targets,
 		Projects: []Project{},
 		Retention: RetentionConfig{
 			Hosts: map[string]HostRetention{
 				"source": {
-					Default:  "", // z.B. "6,1h2d,1d2w,1w3m"
+					Default:  "",
 					Projects: map[string]ProjectRetention{},
 				},
 				"target": {

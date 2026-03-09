@@ -16,9 +16,16 @@ func Onboard(opts OnboardOptions) error {
 		return err
 	}
 
-	err = onboardHost("target", opts.TargetURL, opts.TargetToken, opts)
-	if err != nil {
-		return err
+	for _, t := range opts.Targets {
+		role := fmt.Sprintf("target:%s", t.Name)
+
+		if t.Type != config.TargetTypeIncus {
+			return fmt.Errorf("%s has unsupported type %q (only incus is supported now)", role, t.Type)
+		}
+
+		if err := onboardHost(role, t.URL, t.Token, opts); err != nil {
+			return err
+		}
 	}
 
 	return nil

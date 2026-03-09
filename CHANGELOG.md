@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.0] 
+
+### Breaking Changes
+
+Refactor of the target handeling in IAB:
+- support for multiple targets
+
+Therefore, the complete host config structure is changed. The new confiog must be chnaged by the user. There is no automatic config updater. 
+
 ## [1.1.0] - 2026-02-20
 
 ### Changed
