@@ -1,6 +1,35 @@
 # Include variables from the .envrc file
 -include .envrc
 
+# Detect operating system
+ifeq ($(OS),Windows_NT)
+    DETECTED_OS := Windows
+    ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
+        DETECTED_ARCH = AMD64
+    endif
+    ifeq ($(PROCESSOR_ARCHITECTURE),x86)
+        DETECTED_ARCH = IA32
+    endif
+else
+    # Use 'uname -s' to get the system name (Linux, Darwin, BSD, etc.)
+    # The 'sh -c' part handles cases where uname might not be directly available
+    DETECTED_OS := $(shell sh -c 'uname -s 2>/dev/null || echo Unknown')
+    UNAME_P := $(shell uname -p)
+    ifeq ($(UNAME_P),x86_64)
+        DETECTED_ARCH = AMD64
+    endif
+    ifneq ($(filter %86,$(UNAME_P)),)
+        DETECTED_ARCH = AMD64
+    endif
+    ifneq ($(filter arm%,$(UNAME_P)),)
+        DETECTED_ARCH = ARM
+    endif
+endif
+
+# Convert to lowercase for easier comparisons (optional)
+DETECTED_OS := $(shell echo $(DETECTED_OS) | tr A-Z a-z)
+DETECTED_ARCH := $(shell echo $(DETECTED_ARCH) | tr A-Z a-z)
+
 # ==================================================================================== #
 # HELPERS
 # ==================================================================================== #
@@ -70,7 +99,7 @@ audit:
 .PHONY: build
 build:
 	@echo 'Building ....'
-	GOARCH=amd64 GOOS=linux CGO_ENABLED=0 go build -mod=vendor -trimpath -ldflags='-s -w' -o=./iab ./cmd
+	GOARCH=$(DETECTED_ARCH) GOOS=$(DETECTED_OS) CGO_ENABLED=0 go build -mod=vendor -trimpath -ldflags='-s -w' -o=./iab ./cmd/iab
 
 .PHONY: build debug
 build_debug:
@@ -80,7 +109,7 @@ build_debug:
 .PHONY: build_x86_64
 build_x86_64:
 	@echo 'Building for x86_64 ....'
-	GOARCH=amd64 GOOS=linux CGO_ENABLED=0 go build -ldflags='-s' -trimpath -o=./bin/iab_x86 ./cmd
+	GOARCH=amd64 GOOS=$(DETECTED_OS) CGO_ENABLED=0 go build -ldflags='-s' -trimpath -o=./bin/iab_x86 ./cmd
 
 .PHONY: build_docker_tar
 build_docker_tar:
