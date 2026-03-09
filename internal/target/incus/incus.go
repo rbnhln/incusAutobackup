@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	incus "github.com/lxc/incus/v6/client"
 	"github.com/rbnhln/incusAutobackup/internal/target"
@@ -12,8 +11,7 @@ import (
 )
 
 type Options struct {
-	ProjectName string
-	Name        string
+	Name string
 }
 
 type Target struct {
@@ -22,23 +20,20 @@ type Target struct {
 }
 
 func New(server incus.InstanceServer, opts Options) (*Target, error) {
-	if strings.TrimSpace(opts.ProjectName) == "" {
-		return nil, fmt.Errorf("incus target requires project name")
-	}
 	return &Target{server: server, opts: opts}, nil
 }
 
 func (t *Target) Name() string {
-	return fmt.Sprintf("incus target %s (project: %s)", t.opts.Name, t.opts.ProjectName)
+	return fmt.Sprintf("incus target %s", t.opts.Name)
 }
 
-func (t *Target) scoped() incus.InstanceServer {
-	return t.server.UseProject(t.opts.ProjectName)
+func (t *Target) scoped(projectName string) incus.InstanceServer {
+	return t.server.UseProject(projectName)
 }
 
 func (t *Target) Ping(ctx context.Context) error {
 	_ = ctx
-	_, _, err := t.scoped().GetServer()
+	_, _, err := t.server.GetServer()
 	return err
 }
 
@@ -53,6 +48,12 @@ func (t *Target) Put(ctx context.Context, logger *slog.Logger, arti transfer.Art
 
 func (t *Target) IncusCopy(ctx context.Context, logger *slog.Logger, src incus.InstanceServer, point transfer.RecoveryPoint, opts target.IncusCopyOptions) error {
 	_ = ctx
+
+	projectName, err := projectOrErr(point.Project)
+	if err != nil {
+		return fmt.Errorf("incus copy requires point.Project: %w", err)
+	}
+	dst := t.scoped(projectName)
 
 	switch point.Kind {
 	case transfer.KindInstance:
@@ -71,7 +72,7 @@ func (t *Target) IncusCopy(ctx context.Context, logger *slog.Logger, src incus.I
 		}
 
 		// sanitze devices for target host, drop with warn if not present
-		err = sanitizeDevicesForTarget(logger, t.scoped(), instCopy.Devices, opts.ExcludeDevices)
+		err = sanitizeDevicesForTarget(logger, dst, instCopy.Devices, opts.ExcludeDevices)
 		if err != nil {
 			return fmt.Errorf("sanitize devices failed: %w", err)
 		}
@@ -87,7 +88,7 @@ func (t *Target) IncusCopy(ctx context.Context, logger *slog.Logger, src incus.I
 		}
 
 		// perform copy
-		opCopy, err := t.scoped().CopyInstance(src, instCopy, &copyArgs)
+		opCopy, err := dst.CopyInstance(src, instCopy, &copyArgs)
 		if err != nil {
 			return fmt.Errorf("copy instance %s to target failed: %w", point.Subject, err)
 		}
@@ -119,7 +120,7 @@ func (t *Target) IncusCopy(ctx context.Context, logger *slog.Logger, src incus.I
 		}
 
 		// perform copy
-		opCopy, err := t.scoped().CopyStoragePoolVolume(poolName, src, poolName, *incusVolume, &copyArgs)
+		opCopy, err := dst.CopyStoragePoolVolume(poolName, src, poolName, *incusVolume, &copyArgs)
 		if err != nil {
 			return fmt.Errorf("failed to start copy operation: %w", err)
 		}
@@ -136,11 +137,17 @@ func (t *Target) IncusCopy(ctx context.Context, logger *slog.Logger, src incus.I
 	}
 }
 
-func (t *Target) List(ctx context.Context, kind transfer.Kind, subject string) ([]transfer.RecoveryPoint, error) {
+func (t *Target) List(ctx context.Context, kind transfer.Kind, projectName, subject string) ([]transfer.RecoveryPoint, error) {
 	_ = ctx
+	projectName, err := projectOrErr(projectName)
+	if err != nil {
+		return nil, err
+	}
+	dst := t.scoped(projectName)
+
 	switch kind {
 	case transfer.KindInstance:
-		snaps, err := t.scoped().GetInstanceSnapshots(subject)
+		snaps, err := dst.GetInstanceSnapshots(subject)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +155,7 @@ func (t *Target) List(ctx context.Context, kind transfer.Kind, subject string) (
 		for _, s := range snaps {
 			out = append(out, transfer.RecoveryPoint{
 				Kind:      transfer.KindInstance,
-				Project:   t.opts.ProjectName,
+				Project:   projectName,
 				Subject:   subject,
 				Name:      stripAfterLastSlash(s.Name),
 				CreatedAt: s.CreatedAt,
@@ -161,7 +168,7 @@ func (t *Target) List(ctx context.Context, kind transfer.Kind, subject string) (
 			return nil, err
 		}
 
-		snaps, err := t.scoped().GetStoragePoolVolumeSnapshots(poolName, "custom", volName)
+		snaps, err := dst.GetStoragePoolVolumeSnapshots(poolName, "custom", volName)
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +177,7 @@ func (t *Target) List(ctx context.Context, kind transfer.Kind, subject string) (
 		for _, s := range snaps {
 			out = append(out, transfer.RecoveryPoint{
 				Kind:      transfer.KindVolume,
-				Project:   t.opts.ProjectName,
+				Project:   projectName,
 				Subject:   subject,
 				Name:      stripAfterLastSlash(s.Name),
 				CreatedAt: s.CreatedAt,
@@ -182,12 +189,17 @@ func (t *Target) List(ctx context.Context, kind transfer.Kind, subject string) (
 	}
 }
 
-func (t *Target) Delete(ctx context.Context, point transfer.RecoveryPoint) error {
+func (t *Target) Delete(ctx context.Context, projectName string, point transfer.RecoveryPoint) error {
 	_ = ctx
+	projectName, err := projectOrErr(projectName)
+	if err != nil {
+		return err
+	}
+	dst := t.scoped(projectName)
 
 	switch point.Kind {
 	case transfer.KindInstance:
-		opDel, err := t.scoped().DeleteInstanceSnapshot(point.Subject, point.Name)
+		opDel, err := dst.DeleteInstanceSnapshot(point.Subject, point.Name)
 		if err != nil {
 			return err
 		}
@@ -198,7 +210,7 @@ func (t *Target) Delete(ctx context.Context, point transfer.RecoveryPoint) error
 		if err != nil {
 			return err
 		}
-		opDel, err := t.scoped().DeleteStoragePoolVolumeSnapshot(poolName, "custom", volName, point.Name)
+		opDel, err := dst.DeleteStoragePoolVolumeSnapshot(poolName, "custom", volName, point.Name)
 		if err != nil {
 			return err
 		}

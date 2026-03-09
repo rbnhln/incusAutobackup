@@ -126,3 +126,11 @@ func stripAfterLastSlash(s string) string {
 	}
 	return s
 }
+
+func projectOrErr(projectName string) (string, error) {
+	p := strings.TrimSpace(projectName)
+	if p == "" {
+		return "", fmt.Errorf("project name must not be empty")
+	}
+	return p, nil
+}

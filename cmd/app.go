@@ -154,13 +154,11 @@ func (app *application) serve() (retErr error) {
 
 	//
 	src := source.New(app.logger, sourceClient, source.Options{
-		ProjectName:   app.config.Projects[0].Name,
 		StopIfRunning: app.config.IAB.StopInstance,
 	})
 
 	tgt, err := target.New(targetClient, target.Options{
-		ProjectName: app.config.Projects[0].Name,
-		Name:        targetConfig.Name,
+		Name: targetConfig.Name,
 	})
 
 	if err != nil {

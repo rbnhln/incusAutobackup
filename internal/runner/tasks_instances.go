@@ -98,7 +98,7 @@ func (t InstancePruneTask) Execute(x *ExecCtx) error {
 	}
 
 	// Target prune (über Target-Interface)
-	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindInstance, t.InstanceName, t.TargetPolicy, now, x.DryRunPrune); err != nil {
+	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindInstance, t.InstanceName, t.TargetPolicy, t.ProjectName, now, x.DryRunPrune); err != nil {
 		return fmt.Errorf("target prune failed: %w", err)
 	}
 	return nil

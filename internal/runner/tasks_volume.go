@@ -98,7 +98,7 @@ func (t VolumePruneTask) Execute(x *ExecCtx) error {
 
 	// Target prune (über Target-Interface)
 	subject := fmt.Sprintf("%s/%s", t.PoolName, t.VolumeName)
-	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindVolume, subject, t.TargetPolicy, now, x.DryRunPrune); err != nil {
+	if err := pruneTargetWithCtx(ctx, logger, "target", x.Target, transfer.KindVolume, subject, t.TargetPolicy, t.ProjectName, now, x.DryRunPrune); err != nil {
 		return fmt.Errorf("target prune failed: %w", err)
 	}
 

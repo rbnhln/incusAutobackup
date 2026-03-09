@@ -20,8 +20,8 @@ type Target interface {
 	Close() error
 
 	// retention and prune
-	List(ctx context.Context, kind transfer.Kind, subject string) ([]transfer.RecoveryPoint, error)
-	Delete(ctx context.Context, point transfer.RecoveryPoint) error
+	List(ctx context.Context, kind transfer.Kind, projectName, subject string) ([]transfer.RecoveryPoint, error)
+	Delete(ctx context.Context, projectName string, point transfer.RecoveryPoint) error
 
 	// export-based store (S3, SFT, fs, ...)
 	Put(ctx context.Context, logger *slog.Logger, arti transfer.Artifact) error

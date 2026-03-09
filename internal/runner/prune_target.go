@@ -11,7 +11,7 @@ import (
 	"github.com/rbnhln/incusAutobackup/internal/transfer"
 )
 
-func pruneTargetWithCtx(ctx context.Context, logger *slog.Logger, role string, t target.Target, kind transfer.Kind, subject, policy string, now time.Time, dryRun bool) error {
+func pruneTargetWithCtx(ctx context.Context, logger *slog.Logger, role string, t target.Target, kind transfer.Kind, subject, policy, projectName string, now time.Time, dryRun bool) error {
 	if strings.TrimSpace(policy) == "" {
 		logger.Info("retention disabled; keeping all IAB snapshots", "role", role, "kind", string(kind), "subject", subject, "target", t.Name())
 		return nil
@@ -20,7 +20,7 @@ func pruneTargetWithCtx(ctx context.Context, logger *slog.Logger, role string, t
 	ops := retention.SnapshotOps{
 		Kind: string(kind),
 		List: func() ([]string, error) {
-			points, err := t.List(ctx, kind, subject)
+			points, err := t.List(ctx, kind, projectName, subject)
 			if err != nil {
 				return nil, err
 			}
@@ -34,8 +34,9 @@ func pruneTargetWithCtx(ctx context.Context, logger *slog.Logger, role string, t
 			if dryRun {
 				return nil
 			}
-			return t.Delete(ctx, transfer.RecoveryPoint{
+			return t.Delete(ctx, projectName, transfer.RecoveryPoint{
 				Kind:    kind,
+				Project: projectName,
 				Subject: subject,
 				Name:    name,
 			})
