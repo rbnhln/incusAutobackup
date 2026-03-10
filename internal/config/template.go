@@ -15,16 +15,11 @@ func NewPostOnboardConfig(iabCredDir, sourceURL, uuid string, targets []TargetHo
 		Targets:  targets,
 		Projects: []Project{},
 		Retention: RetentionConfig{
-			Hosts: map[string]HostRetention{
-				"source": {
-					Default:  "",
-					Projects: map[string]ProjectRetention{},
-				},
-				"target": {
-					Default:  "",
-					Projects: map[string]ProjectRetention{},
-				},
+			Source: HostRetention{
+				Default:  "",
+				Projects: map[string]ProjectRetention{},
 			},
+			Targets: map[string]HostRetention{},
 		},
 	}
 }

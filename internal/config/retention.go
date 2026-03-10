@@ -7,11 +7,10 @@ const (
 	RetentionVolumes   RetentionKind = "volumes"
 )
 
-func (c Config) ResolveRetention(role, project string, kind RetentionKind, name string) string {
+func (c Config) resolveFromHostRetention(hr HostRetention, project string, kind RetentionKind, name string) string {
 	var retentionPolicy string
 
-	hr, ok := c.Retention.Hosts[role]
-	if ok && hr.Default != "" {
+	if hr.Default != "" {
 		retentionPolicy = hr.Default
 	}
 
@@ -25,21 +24,31 @@ func (c Config) ResolveRetention(role, project string, kind RetentionKind, name 
 		if pr.Instances.Default != "" {
 			retentionPolicy = pr.Instances.Default
 		}
-		if pr.Instances.ByName != nil {
-			if v, ok := pr.Instances.ByName[name]; ok && v != "" {
-				retentionPolicy = v
-			}
+		v, ok := pr.Instances.ByName[name]
+		if ok && v != "" {
+			retentionPolicy = v
 		}
 	case RetentionVolumes:
 		if pr.Volumes.Default != "" {
 			retentionPolicy = pr.Volumes.Default
 		}
-		if pr.Volumes.ByName != nil {
-			if v, ok := pr.Volumes.ByName[name]; ok && v != "" {
-				retentionPolicy = v
-			}
+		v, ok := pr.Volumes.ByName[name]
+		if ok && v != "" {
+			retentionPolicy = v
 		}
 	}
 
 	return retentionPolicy
+}
+
+func (c Config) ResolveSourceRetention(project, name string, kind RetentionKind) string {
+	return c.resolveFromHostRetention(c.Retention.Source, project, kind, name)
+}
+
+func (c Config) ResolveTargetRetention(targetName, project, name string, kind RetentionKind) string {
+	hr, ok := c.Retention.Targets[targetName]
+	if !ok {
+		return ""
+	}
+	return c.resolveFromHostRetention(hr, project, kind, name)
 }

@@ -73,7 +73,8 @@ type HostRetention struct {
 }
 
 type RetentionConfig struct {
-	Hosts map[string]HostRetention `json:"hosts,omitempty"`
+	Source  HostRetention            `json:"source,omitempty"`
+	Targets map[string]HostRetention `json:"targets,omitempty"`
 }
 
 type Config struct {
@@ -171,75 +172,100 @@ func (c *Config) Validate() error {
 		projectNames[name] = struct{}{}
 	}
 
-	for role, hr := range c.Retention.Hosts {
+	// Validate retention syntax for source + per-target blocks.
+	validateHostRetention := func(scope string, hr HostRetention) {
 		if hr.Default != "" {
-			_, err := retention.ParseSchedule(hr.Default)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("retention.hosts.%s.default: %w", role, err))
+			if _, err := retention.ParseSchedule(hr.Default); err != nil {
+				errs = append(errs, fmt.Errorf("retention.%s.default: %w", scope, err))
 			}
 		}
+
 		for projectName, pr := range hr.Projects {
 			if pr.Default != "" {
-				_, err := retention.ParseSchedule(pr.Default)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("retention.hosts.%s.projects.%s.default: %w", role, projectName, err))
+				if _, err := retention.ParseSchedule(pr.Default); err != nil {
+					errs = append(errs, fmt.Errorf("retention.%s.projects.%s.default: %w", scope, projectName, err))
 				}
 			}
+
 			if pr.Instances.Default != "" {
-				_, err := retention.ParseSchedule(pr.Instances.Default)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("retention.hosts.%s.projects.%s.instances.default: %w", role, projectName, err))
+				if _, err := retention.ParseSchedule(pr.Instances.Default); err != nil {
+					errs = append(errs, fmt.Errorf("retention.%s.projects.%s.instances.default: %w", scope, projectName, err))
 				}
 			}
 			for name, pol := range pr.Instances.ByName {
 				if pol == "" {
 					continue
 				}
-				_, err := retention.ParseSchedule(pol)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("retention.hosts.%s.projects.%s.instances.byName.%s: %w", role, projectName, name, err))
+				if _, err := retention.ParseSchedule(pol); err != nil {
+					errs = append(errs, fmt.Errorf("retention.%s.projects.%s.instances.byName.%s: %w", scope, projectName, name, err))
 				}
 			}
+
 			if pr.Volumes.Default != "" {
-				_, err := retention.ParseSchedule(pr.Volumes.Default)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("retention.hosts.%s.projects.%s.volumes.default: %w", role, projectName, err))
+				if _, err := retention.ParseSchedule(pr.Volumes.Default); err != nil {
+					errs = append(errs, fmt.Errorf("retention.%s.projects.%s.volumes.default: %w", scope, projectName, err))
 				}
 			}
 			for name, pol := range pr.Volumes.ByName {
 				if pol == "" {
 					continue
 				}
-				_, err := retention.ParseSchedule(pol)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("retention.hosts.%s.projects.%s.volumes.byName.%s: %w", role, projectName, name, err))
+				if _, err := retention.ParseSchedule(pol); err != nil {
+					errs = append(errs, fmt.Errorf("retention.%s.projects.%s.volumes.byName.%s: %w", scope, projectName, name, err))
 				}
 			}
 		}
 	}
 
+	// Source retention block
+	validateHostRetention("source", c.Retention.Source)
+
+	// Target retention blocks
+	for targetName := range c.Retention.Targets {
+		if _, ok := targetNames[targetName]; !ok {
+			errs = append(errs, fmt.Errorf("retention.targets.%s is configured but no such target exists", targetName))
+		}
+	}
+	for targetName, hr := range c.Retention.Targets {
+		validateHostRetention(fmt.Sprintf("targets.%s", targetName), hr)
+	}
+
+	// Validate fully-resolved policies for configured resources.
 	for _, p := range c.Projects {
 		for _, vol := range p.Volumes {
-			for _, role := range []string{"source", "target"} {
-				pol := c.ResolveRetention(role, p.Name, RetentionVolumes, vol.Name)
-				if pol == "" {
+			pol := c.ResolveSourceRetention(vol.Name, p.Name, RetentionVolumes)
+			if pol != "" {
+				if _, err := retention.ParseSchedule(pol); err != nil {
+					errs = append(errs, fmt.Errorf("resolved retention (source/%s volume %s): %w", p.Name, vol.Name, err))
+				}
+			}
+
+			for _, t := range c.Targets {
+				tpol := c.ResolveTargetRetention(t.Name, vol.Name, p.Name, RetentionVolumes)
+				if tpol == "" {
 					continue
 				}
-				_, err := retention.ParseSchedule(pol)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("resolved retention (%s/%s volume %s): %w", role, p.Name, vol.Name, err))
+				if _, err := retention.ParseSchedule(tpol); err != nil {
+					errs = append(errs, fmt.Errorf("resolved retention (target=%s/%s volume %s): %w", t.Name, p.Name, vol.Name, err))
 				}
 			}
 		}
+
 		for _, inst := range p.Instances {
-			for _, role := range []string{"source", "target"} {
-				pol := c.ResolveRetention(role, p.Name, RetentionInstances, inst.Name)
-				if pol == "" {
+			pol := c.ResolveSourceRetention(inst.Name, p.Name, RetentionInstances)
+			if pol != "" {
+				if _, err := retention.ParseSchedule(pol); err != nil {
+					errs = append(errs, fmt.Errorf("resolved retention (source/%s instance %s): %w", p.Name, inst.Name, err))
+				}
+			}
+
+			for _, t := range c.Targets {
+				tpol := c.ResolveTargetRetention(t.Name, inst.Name, p.Name, RetentionInstances)
+				if tpol == "" {
 					continue
 				}
-				_, err := retention.ParseSchedule(pol)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("resolved retention (%s/%s instance %s): %w", role, p.Name, inst.Name, err))
+				if _, err := retention.ParseSchedule(tpol); err != nil {
+					errs = append(errs, fmt.Errorf("resolved retention (target=%s/%s instance %s): %w", t.Name, p.Name, inst.Name, err))
 				}
 			}
 		}

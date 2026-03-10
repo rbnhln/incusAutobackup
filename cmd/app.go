@@ -35,7 +35,6 @@ func (app *application) serve() (retErr error) {
 	snapshotPlan := runner.Plan{}    //performed on source
 	copyPlan := runner.Plan{}        // performed for each target
 	sourcePrunePlan := runner.Plan{} // performed on host
-	targetPrunePlan := runner.Plan{} // performed on each target
 
 	for _, project := range app.config.Projects {
 		for _, vol := range project.Volumes {
@@ -52,24 +51,12 @@ func (app *application) serve() (retErr error) {
 				Mode:        project.Mode,
 			})
 
-			srcPol := app.config.ResolveRetention("source", project.Name, config.RetentionVolumes, vol.Name)
-			tgtPol := app.config.ResolveRetention("target", project.Name, config.RetentionVolumes, vol.Name)
-			if app.config.IAB.IncusOSfix {
-				tgtPol = srcPol
-			}
-
+			srcPol := app.config.ResolveSourceRetention(project.Name, vol.Name, config.RetentionVolumes)
 			sourcePrunePlan.Add(runner.VolumeSourcePruneTask{
 				ProjectName:  project.Name,
 				PoolName:     vol.Storage,
 				VolumeName:   vol.Name,
 				SourcePolicy: srcPol,
-			})
-
-			targetPrunePlan.Add(runner.VolumeTargetPruneTask{
-				ProjectName:  project.Name,
-				PoolName:     vol.Storage,
-				VolumeName:   vol.Name,
-				TargetPolicy: tgtPol,
 			})
 		}
 
@@ -87,22 +74,11 @@ func (app *application) serve() (retErr error) {
 				ExcludeDevices: inst.ExcludeDevices,
 			})
 
-			srcPol := app.config.ResolveRetention("source", project.Name, config.RetentionInstances, inst.Name)
-			tgtPol := app.config.ResolveRetention("target", project.Name, config.RetentionInstances, inst.Name)
-			if app.config.IAB.IncusOSfix {
-				tgtPol = srcPol
-			}
-
+			srcPol := app.config.ResolveSourceRetention(project.Name, inst.Name, config.RetentionInstances)
 			sourcePrunePlan.Add(runner.InstanceSourcePruneTask{
 				ProjectName:  project.Name,
 				InstanceName: inst.Name,
 				SourcePolicy: srcPol,
-			})
-
-			targetPrunePlan.Add(runner.InstanceTargetPruneTask{
-				ProjectName:  project.Name,
-				InstanceName: inst.Name,
-				TargetPolicy: tgtPol,
 			})
 		}
 	}
@@ -161,6 +137,38 @@ func (app *application) serve() (retErr error) {
 
 	// Step 2 copy/prune for each target
 	for _, targetConfig := range targets {
+		// Build target-specific prune plan for this target.
+		targetPrunePlan := runner.Plan{}
+		for _, project := range app.config.Projects {
+			for _, vol := range project.Volumes {
+				tgtPol := app.config.ResolveTargetRetention(targetConfig.Name, project.Name, vol.Name, config.RetentionVolumes)
+				if app.config.IAB.IncusOSfix {
+					srcPol := app.config.ResolveSourceRetention(project.Name, vol.Name, config.RetentionVolumes)
+					tgtPol = srcPol
+				}
+
+				targetPrunePlan.Add(runner.VolumeTargetPruneTask{
+					ProjectName:  project.Name,
+					PoolName:     vol.Storage,
+					VolumeName:   vol.Name,
+					TargetPolicy: tgtPol,
+				})
+			}
+
+			for _, inst := range project.Instances {
+				tgtPol := app.config.ResolveTargetRetention(targetConfig.Name, project.Name, inst.Name, config.RetentionInstances)
+				if app.config.IAB.IncusOSfix {
+					srcPol := app.config.ResolveSourceRetention(project.Name, inst.Name, config.RetentionInstances)
+					tgtPol = srcPol
+				}
+
+				targetPrunePlan.Add(runner.InstanceTargetPruneTask{
+					ProjectName:  project.Name,
+					InstanceName: inst.Name,
+					TargetPolicy: tgtPol,
+				})
+			}
+		}
 		app.logger.Info("Connecting to target", "target", targetConfig.Name, "url", targetConfig.URL)
 
 		targetClient, err := app.ConnectToTarget(targetConfig)
