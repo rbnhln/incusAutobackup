@@ -7,6 +7,7 @@ func NewPostOnboardConfig(iabCredDir, sourceURL, targetURL, uuid string) Config 
 			UUID:            uuid,
 			StopInstance:    false,
 			HealthchecksURL: "",
+			GotifyURL:       "",
 		},
 		Hosts: []Host{
 			{Role: "source", URL: sourceURL, Name: ""},

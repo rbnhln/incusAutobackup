@@ -159,6 +159,7 @@ Example config: `config.json.example` (note: the filename is currently spelled `
 - `uuid`: set by onboarding
 - `stopInstance`: if `true`, stop running instances before snapshot/copy and start them afterwards
 - `healthchecksUrl`: optional Healthchecks ping URL (see below)
+- `gotifyURL`: optional Gotify notification URL (see below)
 
 ### `hosts`
 
@@ -281,6 +282,21 @@ See `config.json.example` for a full hierarchy.
 ### Healthchecks
 
 Provide your [healthchecks](https://github.com/healthchecks/healthchecks) URL to enable start and finish notifications. 
+
+### Gotify 
+
+Provide your [gotify](https://github.com/gotify) URL (incl. App Token) to get notified when IAB finished with errors. 
+
+### Config examples
+```
+{
+  "iab": {
+    "iabCredDir": "./root/.config/incusAutobackup",
+    ...
+	"healthchecksUrl": "https://hc.example.tld/ping/your-uuid-here",
+    "gotifyUrl": "https://gotify.example.tld/message?token=APP_TOKEN"
+  },
+```
 
 ## Licensing
 

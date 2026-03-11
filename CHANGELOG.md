@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1] - 2026-03-11
+
+## Added
+- Added Gotify as a new notification option (#12)
+
+## Build
+- build(deps) upated incus/v6 to v6.22.0
+
 ## [1.1.0] - 2026-02-20
 
 ### Changed
