@@ -3,7 +3,8 @@
     "iabCredDir": "./root/.config/incusAutobackup",
     "uuid": "",
     "stopInstance": false,
-    "healthchecksUrl": "https://hc.example.tld/ping/your-uuid-here"
+    "healthchecksUrl": "https://hc.example.tld/ping/your-uuid-here",
+    "gotifyUrl": "https://gotify.example.tld/message?token=APP_TOKEN"
   },
   "hosts": [
     {

@@ -25,6 +25,9 @@ func NewManagerFromConfig(logger *slog.Logger, cfg config.Config) *Manager {
 	if cfg.IAB.HealthchecksURL != "" {
 		m.notifiers = append(m.notifiers, NewHealthchecksNotifier(cfg.IAB.HealthchecksURL))
 	}
+	if cfg.IAB.GotifyURL != "" {
+		m.notifiers = append(m.notifiers, NewGotifyNotifier(cfg.IAB.GotifyURL))
+	}
 	return m
 }
 

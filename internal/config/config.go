@@ -15,6 +15,7 @@ type IAB struct {
 	UUID            string `json:"uuid"`
 	StopInstance    bool   `json:"stopInstance,omitempty"`
 	HealthchecksURL string `json:"healthchecksUrl,omitempty"`
+	GotifyURL       string `json:"gotifyUrl,omitempty"`
 	DryRunCopy      bool   `json:"-"`
 	DryRunPrune     bool   `json:"-"`
 	IncusOSfix      bool   `json:"-"`
