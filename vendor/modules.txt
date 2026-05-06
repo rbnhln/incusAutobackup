@@ -17,8 +17,8 @@ github.com/cespare/xxhash/v2
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
-# github.com/containerd/platforms v0.2.1
-## explicit; go 1.20
+# github.com/containerd/platforms v1.0.0-rc.4
+## explicit; go 1.24
 github.com/containerd/platforms
 # github.com/cpuguy83/go-md2man/v2 v2.0.7
 ## explicit; go 1.12
@@ -30,7 +30,7 @@ github.com/cyphar/filepath-securejoin/internal/consts
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/go-jose/go-jose/v4 v4.1.3
+# github.com/go-jose/go-jose/v4 v4.1.4
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
@@ -48,10 +48,10 @@ github.com/google/uuid
 # github.com/gorilla/securecookie v1.1.2
 ## explicit; go 1.20
 github.com/gorilla/securecookie
-# github.com/gorilla/websocket v1.5.3
-## explicit; go 1.12
+# github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
+## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/klauspost/compress v1.18.5
+# github.com/klauspost/compress v1.18.6
 ## explicit; go 1.24
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
@@ -68,7 +68,7 @@ github.com/klauspost/pgzip
 # github.com/kr/fs v0.1.0
 ## explicit
 github.com/kr/fs
-# github.com/lxc/incus/v6 v6.23.0
+# github.com/lxc/incus/v6 v6.23.1-0.20260327174201-6acde8bd711a
 ## explicit; go 1.25.6
 github.com/lxc/incus/v6/client
 github.com/lxc/incus/v6/shared/api
@@ -85,6 +85,8 @@ github.com/lxc/incus/v6/shared/tls
 github.com/lxc/incus/v6/shared/units
 github.com/lxc/incus/v6/shared/util
 github.com/lxc/incus/v6/shared/ws
+# github.com/lxc/incus/v7 v7.0.0
+## explicit; go 1.25.6
 # github.com/moby/sys/user v0.4.0
 ## explicit; go 1.17
 github.com/moby/sys/user
@@ -158,8 +160,8 @@ github.com/vbatts/go-mtree/xattr
 # github.com/zitadel/logging v0.7.0
 ## explicit; go 1.24.10
 github.com/zitadel/logging
-# github.com/zitadel/oidc/v3 v3.45.5
-## explicit; go 1.24.10
+# github.com/zitadel/oidc/v3 v3.47.5
+## explicit; go 1.25.0
 github.com/zitadel/oidc/v3/internal/otel
 github.com/zitadel/oidc/v3/pkg/client
 github.com/zitadel/oidc/v3/pkg/client/rp
@@ -174,7 +176,7 @@ github.com/zitadel/schema
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/otel v1.42.0
+# go.opentelemetry.io/otel v1.43.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/otel
 go.opentelemetry.io/otel/attribute
@@ -188,17 +190,17 @@ go.opentelemetry.io/otel/internal/global
 go.opentelemetry.io/otel/propagation
 go.opentelemetry.io/otel/semconv/v1.37.0
 go.opentelemetry.io/otel/semconv/v1.40.0
-# go.opentelemetry.io/otel/metric v1.42.0
+# go.opentelemetry.io/otel/metric v1.43.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/metric/embedded
-# go.opentelemetry.io/otel/trace v1.42.0
+# go.opentelemetry.io/otel/trace v1.43.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
-# golang.org/x/crypto v0.49.0
+# golang.org/x/crypto v0.50.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -214,6 +216,10 @@ golang.org/x/exp/typeparams
 # golang.org/x/mod v0.35.0
 ## explicit; go 1.25.0
 golang.org/x/mod/semver
+# golang.org/x/net v0.53.0
+## explicit; go 1.25.0
+golang.org/x/net/internal/socks
+golang.org/x/net/proxy
 # golang.org/x/oauth2 v0.36.0
 ## explicit; go 1.25.0
 golang.org/x/oauth2
@@ -239,10 +245,10 @@ golang.org/x/telemetry/internal/crashmonitor
 golang.org/x/telemetry/internal/mmap
 golang.org/x/telemetry/internal/telemetry
 golang.org/x/telemetry/internal/upload
-# golang.org/x/term v0.41.0
+# golang.org/x/term v0.42.0
 ## explicit; go 1.25.0
 golang.org/x/term
-# golang.org/x/text v0.35.0
+# golang.org/x/text v0.36.0
 ## explicit; go 1.25.0
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
