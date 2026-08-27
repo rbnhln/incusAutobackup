@@ -4,7 +4,7 @@ go 1.25.6
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/lxc/incus/v6 v6.23.0
+	github.com/lxc/incus/v7 v7.4.0
 )
 
 require (
